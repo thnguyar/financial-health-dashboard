@@ -29,7 +29,13 @@ export const authService = {
   },
   signUp: async (email: string, password: string) => {
     const client = requireSupabase();
-    const { data, error } = await client.auth.signUp({ email, password });
+    const { data, error } = await client.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
     if (error) throw error;
     return data;
   },
