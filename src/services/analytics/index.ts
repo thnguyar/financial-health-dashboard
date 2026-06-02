@@ -11,6 +11,23 @@ import { growth } from "../../utils/format";
 
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 const avg = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+const normalizeReason = (value: string) => value.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+
+const compactReason = (reason: string) => {
+  const seen = new Set<string>();
+  const sentences = reason
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => {
+      const normalized = normalizeReason(item);
+      const isDuplicate = [...seen].some((prior) => normalized === prior || normalized.includes(prior) || prior.includes(normalized));
+      if (isDuplicate) return false;
+      seen.add(normalized);
+      return true;
+    });
+  return sentences.slice(0, 2).join(" ");
+};
 
 export const latest = (company: CompanyData) => company.financials[0];
 export const previousQuarter = (company: CompanyData) => company.financials[1] ?? company.financials[0];
@@ -210,7 +227,7 @@ export const calculateAffectedStocks = (news: NewsItem[], companies: CompanyData
       impactScore: Math.max(results.get(item.directTicker)?.impactScore ?? 0, directScore),
       relationship: "Direct",
       sentiment: item.sentiment,
-      reason: item.reason,
+      reason: compactReason(item.reason),
     });
 
     relationshipMap[item.directTicker]?.forEach((relation, index) => {
@@ -223,7 +240,7 @@ export const calculateAffectedStocks = (news: NewsItem[], companies: CompanyData
           impactScore: score,
           relationship: relation.relationship,
           sentiment: item.sentiment,
-          reason: relation.reason,
+          reason: compactReason(relation.reason),
         });
       }
     });
