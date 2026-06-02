@@ -7,6 +7,7 @@ const PORT = Number(process.env.API_PORT || 8787);
 const FMP_BASE = "https://financialmodelingprep.com/api/v3";
 const FINNHUB_BASE = "https://finnhub.io/api/v1";
 const GOOGLE_FINANCE_BASE = "https://www.google.com/finance/beta/quote";
+const YAHOO_FINANCE_RSS_BASE = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 const TTL_MS = Number(process.env.API_CACHE_TTL_MS || 10 * 60 * 1000);
 const RATE_WINDOW_MS = Number(process.env.API_RATE_WINDOW_MS || 60 * 1000);
 const RATE_LIMIT = Number(process.env.API_RATE_LIMIT || 90);
@@ -171,6 +172,57 @@ async function fetchGoogleFinanceQuote(ticker) {
   throw lastError ?? new Error(`Google Finance quote failed for ${ticker}.`);
 }
 
+const decodeXml = (value = "") =>
+  value
+    .replace(/<!\[CDATA\[(.*?)\]\]>/gs, "$1")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .trim();
+
+const getXmlTag = (xml, tag) => decodeXml(xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"))?.[1] ?? "");
+
+async function fetchYahooFinanceNews(ticker) {
+  const url = new URL(YAHOO_FINANCE_RSS_BASE);
+  url.searchParams.set("s", ticker);
+  url.searchParams.set("region", "US");
+  url.searchParams.set("lang", "en-US");
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      Accept: "application/rss+xml,text/xml",
+    },
+  });
+  if (!response.ok) {
+    const error = new Error(`Yahoo Finance RSS returned HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  const xml = await response.text();
+  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].slice(0, 20).map((match, index) => {
+    const item = match[1];
+    const link = getXmlTag(item, "link");
+    const title = getXmlTag(item, "title");
+    const pubDate = getXmlTag(item, "pubDate");
+    const summary = getXmlTag(item, "description").replace(/<[^>]*>/g, "");
+    return {
+      id: getXmlTag(item, "guid") || link || `${ticker}-yahoo-${index}`,
+      title,
+      headline: title,
+      text: summary || title,
+      summary: summary || title,
+      publishedDate: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+      pubDate,
+      site: "Yahoo Finance",
+      source: "Yahoo Finance",
+      symbol: ticker,
+      url: link,
+    };
+  });
+}
+
 const handleCached = (route, getter) => async (req, res) => {
   let ticker = "";
   try {
@@ -232,6 +284,7 @@ app.get("/health", (_req, res) => {
     fmpConfigured: Boolean(process.env.FMP_API_KEY),
     finnhubConfigured: Boolean(process.env.FINNHUB_API_KEY),
     googleFinanceConfigured: true,
+    yahooFinanceNewsConfigured: true,
     cacheEntries: cache.size,
   });
 });
@@ -243,6 +296,7 @@ app.get("/api/health", (_req, res) => {
     fmpConfigured: Boolean(process.env.FMP_API_KEY),
     finnhubConfigured: Boolean(process.env.FINNHUB_API_KEY),
     googleFinanceConfigured: true,
+    yahooFinanceNewsConfigured: true,
     cacheEntries: cache.size,
   });
 });
@@ -299,6 +353,9 @@ app.get(
   handleCached("news", async (ticker) => {
     if (process.env.FMP_API_KEY) {
       return fetchJson(fmpUrl("/stock_news", { tickers: ticker, limit: 40 }));
+    }
+    if (!process.env.FINNHUB_API_KEY) {
+      return fetchYahooFinanceNews(ticker);
     }
     const to = new Date().toISOString().slice(0, 10);
     const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);

@@ -58,7 +58,7 @@ const getProxyNews = async (tickers: string[]): Promise<NewsItem[]> => {
         id: row.id ? String(row.id) : `${ticker}-${index}`,
         title: row.title ?? row.headline ?? "Untitled company news",
         source: row.site ?? row.source ?? "Market News",
-        publishedAt: row.publishedDate ? new Date(row.publishedDate).toISOString() : row.datetime ? new Date(Number(row.datetime) * 1000).toISOString() : new Date().toISOString(),
+        publishedAt: row.publishedDate ? new Date(row.publishedDate).toISOString() : row.pubDate ? new Date(row.pubDate).toISOString() : row.datetime ? new Date(Number(row.datetime) * 1000).toISOString() : new Date().toISOString(),
         summary: row.text ?? row.summary ?? row.title ?? row.headline ?? "",
         sentiment: inferSentiment(row.title ?? row.headline ?? ""),
         impact: inferImpact(`${row.title ?? row.headline ?? ""} ${row.text ?? row.summary ?? ""}`),
@@ -78,7 +78,10 @@ export const getNews = async (tickers: string[], force = false): Promise<NewsIte
 
   try {
     const live = await getProxyNews(tickers);
-    const enriched = live.map((item) => enrichNewsItem(item, tickers)).filter((item) => trustedSources.includes(item.source) || item.source);
+    const enriched = live
+      .map((item) => enrichNewsItem(item, tickers))
+      .filter((item) => trustedSources.includes(item.source) || item.source)
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
     storage.saveNews(enriched);
     return enriched;
   } catch {

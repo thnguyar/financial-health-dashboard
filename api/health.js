@@ -6,5 +6,6 @@ export default function handler(_req, res) {
     finnhubConfigured: Boolean(process.env.FINNHUB_API_KEY),
     polygonConfigured: Boolean(process.env.POLYGON_API_KEY),
     googleFinanceConfigured: true,
+    yahooFinanceNewsConfigured: true,
   });
 }
