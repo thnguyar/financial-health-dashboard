@@ -101,12 +101,21 @@ const signalStyle: Record<InvestmentSignal, string> = {
   "Sell / Avoid": "bg-rose-600 text-white",
 };
 
+const navItems = [
+  { id: "dashboard", label: "Dashboard", icon: BarChart3 },
+  { id: "company-analysis", label: "Company Analysis", icon: Building2 },
+  { id: "news-intelligence", label: "News Intelligence", icon: Newspaper },
+  { id: "watchlist", label: "Watchlist", icon: WalletCards },
+  { id: "portfolio-risk", label: "Portfolio Risk", icon: Gauge },
+  { id: "alerts", label: "Alerts", icon: Bell },
+];
+
 function Badge({ children, className }: { children: ReactNode; className?: string }) {
   return <span className={cx("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold", className)}>{children}</span>;
 }
 
-function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cx("rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900", className)}>{children}</section>;
+function Card({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
+  return <section id={id} className={cx("rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900", className)}>{children}</section>;
 }
 
 function SectionTitle({ icon: Icon, title, action }: { icon: typeof Activity; title: string; action?: ReactNode }) {
@@ -574,6 +583,7 @@ export function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [activeNav, setActiveNav] = useState("dashboard");
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -683,6 +693,11 @@ export function Dashboard() {
     return Math.round(data.companies.reduce((sum, company) => sum + calculateHealthScore(company).total, 0) / data.companies.length);
   }, [data.companies]);
 
+  const scrollToSection = (id: string) => {
+    setActiveNav(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   if (authLoading) {
     return <div className="dark grid min-h-screen place-items-center bg-slate-950 text-slate-100">Loading secure session...</div>;
   }
@@ -699,9 +714,23 @@ export function Dashboard() {
             <div className="grid h-10 w-10 place-items-center rounded-lg bg-cyan-400 text-slate-950"><Activity className="h-5 w-5" /></div>
             <div><p className="text-sm font-bold">Equity Health</p><p className="text-xs text-slate-400">Live Intelligence</p></div>
           </div>
-          {["Dashboard", "Company Analysis", "News Intelligence", "Watchlist", "Portfolio Risk", "Alerts"].map((item) => (
-            <div key={item} className="mb-1 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-slate-300"><BarChart3 className="h-4 w-4" />{item}</div>
-          ))}
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeNav === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => scrollToSection(item.id)}
+                className={cx(
+                  "mb-1 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition",
+                  isActive ? "bg-cyan-400 text-slate-950" : "text-slate-300 hover:bg-slate-900 hover:text-white",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </button>
+            );
+          })}
         </aside>
         <main className="min-w-0 lg:pl-64">
           <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 md:px-6">
@@ -734,7 +763,7 @@ export function Dashboard() {
             </div>
           </header>
 
-          <div className="grid gap-4 p-4 md:p-6">
+          <div id="dashboard" className="grid scroll-mt-28 gap-4 p-4 md:p-6">
             {(errors.length > 0 || data.errors.length > 0) && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -747,9 +776,9 @@ export function Dashboard() {
               </div>
             )}
             {loading && <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm font-semibold text-cyan-800 dark:border-cyan-900/60 dark:bg-cyan-950/30 dark:text-cyan-200">Refreshing market data, financial statements, and news...</div>}
-            <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
+            <div id="watchlist" className="grid scroll-mt-28 gap-4 xl:grid-cols-[1fr_280px]">
               <PortfolioManager portfolio={portfolio} setPortfolio={setPortfolio} selectedTicker={settings.selectedTicker} setSelectedTicker={(ticker) => setSettings({ ...settings, selectedTicker: ticker })} companies={data.companies} />
-              <Card>
+              <Card id="portfolio-risk" className="scroll-mt-28">
                 <SectionTitle icon={Gauge} title="Portfolio Pulse" />
                 <div className="grid gap-3">
                   <MetricCard label="Avg Health" value={`${portfolioHealth}/100`} sub="Across loaded tickers" />
@@ -758,9 +787,13 @@ export function Dashboard() {
                 </div>
               </Card>
             </div>
-            {selected ? <CompanyOverview company={selected} news={data.news} /> : <Card><p>No ticker loaded yet. Add a ticker to begin.</p></Card>}
-            <NewsPanel news={data.news} settings={settings} setSettings={setSettings} companies={data.companies} />
-            <Card>
+            <div id="company-analysis" className="scroll-mt-28">
+              {selected ? <CompanyOverview company={selected} news={data.news} /> : <Card><p>No ticker loaded yet. Add a ticker to begin.</p></Card>}
+            </div>
+            <div id="news-intelligence" className="scroll-mt-28">
+              <NewsPanel news={data.news} settings={settings} setSettings={setSettings} companies={data.companies} />
+            </div>
+            <Card id="alerts" className="scroll-mt-28">
               <SectionTitle icon={Bell} title="Reliability Notes" action={<button onClick={() => setSettings({ ...defaultSettings, selectedTicker: settings.selectedTicker })} className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold dark:border-slate-700"><X className="h-3 w-3" /> Reset filters</button>} />
               <div className="grid gap-3 text-sm text-slate-600 dark:text-slate-300 md:grid-cols-3">
                 <p>Portfolio and settings are stored in Supabase PostgreSQL per authenticated user. LocalStorage is only a migration/cache fallback.</p>
