@@ -260,6 +260,9 @@ export const calculatePositionMetrics = (position: PortfolioPosition, company?: 
   const price = company?.profile.price ?? 0;
   const marketValue = position.shares * price;
   const costBasis = position.shares * position.averageCost;
+  if (!position.averageCost) {
+    return { price, marketValue, costBasis: 0, unrealizedPl: 0, unrealizedPlPercent: 0 };
+  }
   const unrealizedPl = marketValue - costBasis;
   const unrealizedPlPercent = costBasis ? unrealizedPl / costBasis : 0;
   return { price, marketValue, costBasis, unrealizedPl, unrealizedPlPercent };

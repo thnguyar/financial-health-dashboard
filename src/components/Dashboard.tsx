@@ -166,6 +166,7 @@ function PortfolioManager({
   const [suggestions, setSuggestions] = useState<Array<{ ticker: string; name: string; exchange?: string }>>([]);
   const byTicker = new Map(companies.map((company) => [company.profile.ticker, company]));
   const totals = calculatePortfolioTotals(portfolio, companies);
+  const missingBuyPriceCount = portfolio.filter((position) => !position.averageCost).length;
 
   useEffect(() => {
     let active = true;
@@ -179,11 +180,13 @@ function PortfolioManager({
 
   const addTicker = (ticker = query) => {
     const upper = ticker.trim().toUpperCase();
-    if (!upper) return;
+    const numericShares = Math.max(0, Number(shares) || 0);
+    const buyPrice = Math.max(0, Number(averageCost) || 0);
+    if (!upper || !numericShares || !buyPrice) return;
     const position: PortfolioPosition = {
       ticker: upper,
-      shares: Math.max(0, Number(shares) || 0),
-      averageCost: Math.max(0, Number(averageCost) || 0),
+      shares: numericShares,
+      averageCost: buyPrice,
       purchaseDate,
       addedAt: new Date().toISOString(),
     };
@@ -209,6 +212,11 @@ function PortfolioManager({
   return (
     <Card>
       <SectionTitle icon={WalletCards} title="Portfolio & Watchlist" action={<Badge className="bg-slate-900 text-white dark:bg-white dark:text-slate-950">{portfolio.length} tickers</Badge>} />
+      {missingBuyPriceCount > 0 && (
+        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+          {missingBuyPriceCount} position{missingBuyPriceCount > 1 ? "s are" : " is"} missing buy price. Add a Buy Price to calculate P/L.
+        </div>
+      )}
       <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
           <div className="grid gap-2 md:grid-cols-[1fr_100px_120px_140px_auto]">
@@ -217,9 +225,9 @@ function PortfolioManager({
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search ticker: AMD, META, GOOGL..." className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-700 dark:bg-slate-950" />
             </label>
             <input value={shares} onChange={(event) => setShares(event.target.value)} placeholder="Shares" type="number" min="0" className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
-            <input value={averageCost} onChange={(event) => setAverageCost(event.target.value)} placeholder="Avg cost" type="number" min="0" className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
+            <input value={averageCost} onChange={(event) => setAverageCost(event.target.value)} placeholder="Buy price" type="number" min="0" step="0.01" className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
             <input value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} type="date" className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
-            <button onClick={() => addTicker()} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-bold text-slate-950">
+            <button onClick={() => addTicker()} disabled={!query.trim() || !Number(shares) || !Number(averageCost)} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-bold text-slate-950 disabled:opacity-50">
               <Plus className="h-4 w-4" /> Add
             </button>
           </div>
@@ -245,9 +253,9 @@ function PortfolioManager({
             <tr>
               <th className="pb-3">Ticker</th>
               <th className="pb-3">Shares</th>
-              <th className="pb-3">Avg Cost</th>
+              <th className="pb-3">Buy Price</th>
               <th className="pb-3">Purchase Date</th>
-              <th className="pb-3">Last Price</th>
+              <th className="pb-3">Current Price</th>
               <th className="pb-3">Market Value</th>
               <th className="pb-3">P/L</th>
               <th className="pb-3">Action</th>
@@ -264,11 +272,13 @@ function PortfolioManager({
                     <p className="text-xs text-slate-500">{company?.profile.name ?? "Loading company data"}</p>
                   </td>
                   <td className="py-3"><input aria-label={`${position.ticker} shares`} type="number" min="0" value={position.shares} onChange={(event) => updatePosition(position.ticker, { shares: Number(event.target.value) || 0 })} className="h-9 w-24 rounded border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-950" /></td>
-                  <td className="py-3"><input aria-label={`${position.ticker} average cost`} type="number" min="0" value={position.averageCost} onChange={(event) => updatePosition(position.ticker, { averageCost: Number(event.target.value) || 0 })} className="h-9 w-28 rounded border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-950" /></td>
+                  <td className="py-3"><input aria-label={`${position.ticker} buy price`} type="number" min="0" step="0.01" value={position.averageCost} onChange={(event) => updatePosition(position.ticker, { averageCost: Number(event.target.value) || 0 })} className={cx("h-9 w-28 rounded border bg-white px-2 dark:bg-slate-950", position.averageCost ? "border-slate-300 dark:border-slate-700" : "border-amber-400 dark:border-amber-500")} /></td>
                   <td className="py-3"><input aria-label={`${position.ticker} purchase date`} type="date" value={position.purchaseDate} onChange={(event) => updatePosition(position.ticker, { purchaseDate: event.target.value })} className="h-9 rounded border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-950" /></td>
                   <td className="py-3 font-semibold">{metrics.price ? currency(metrics.price, false) : "N/A"}</td>
                   <td className="py-3">{currency(metrics.marketValue, false)}</td>
-                  <td className={cx("py-3 font-semibold", metrics.unrealizedPl >= 0 ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300")}>{currency(metrics.unrealizedPl, false)} · {percent(metrics.unrealizedPlPercent)}</td>
+                  <td className={cx("py-3 font-semibold", position.averageCost > 0 && (metrics.unrealizedPl >= 0 ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300"))}>
+                    {position.averageCost ? `${currency(metrics.unrealizedPl, false)} · ${percent(metrics.unrealizedPlPercent)}` : "Add buy price"}
+                  </td>
                   <td className="py-3"><button aria-label={`Remove ${position.ticker}`} onClick={() => removeTicker(position.ticker)} className="grid h-9 w-9 place-items-center rounded-md border border-slate-300 text-rose-600 hover:bg-rose-50 dark:border-slate-700 dark:hover:bg-rose-950/30"><Trash2 className="h-4 w-4" /></button></td>
                 </tr>
               );
