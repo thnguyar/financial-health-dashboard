@@ -84,6 +84,7 @@ export const fmpProvider: MarketDataProvider = {
     const marketCap = Number(profile.mktCap || quote.marketCap || 0);
     const company: CompanyData = {
       source,
+      sourceLabels: ["Financial Modeling Prep"],
       fetchedAt: new Date().toISOString(),
       error: error || undefined,
       profile: {

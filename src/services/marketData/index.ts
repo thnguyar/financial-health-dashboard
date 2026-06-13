@@ -36,6 +36,7 @@ const withGoogleFinanceQuote = async (ticker: string, company: CompanyData): Pro
   return {
     ...company,
     source: source === "live" ? "live" : "cache",
+    sourceLabels: [...new Set([...(company.sourceLabels ?? []), "Google Finance"])],
     fetchedAt: new Date().toISOString(),
     error,
     profile: {

@@ -228,6 +228,7 @@ export const calculateAffectedStocks = (news: NewsItem[], companies: CompanyData
       relationship: "Direct",
       sentiment: item.sentiment,
       reason: compactReason(item.reason),
+      sourceLabels: [...new Set([...(results.get(item.directTicker)?.sourceLabels ?? []), item.source])],
     });
 
     relationshipMap[item.directTicker]?.forEach((relation, index) => {
@@ -241,6 +242,7 @@ export const calculateAffectedStocks = (news: NewsItem[], companies: CompanyData
           relationship: relation.relationship,
           sentiment: item.sentiment,
           reason: compactReason(relation.reason),
+          sourceLabels: [...new Set([...(results.get(relation.ticker)?.sourceLabels ?? []), item.source])],
         });
       }
     });

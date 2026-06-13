@@ -51,6 +51,7 @@ export interface CompanyData {
   marketTrend: number;
   nextEarnings: string;
   source?: DataSource;
+  sourceLabels?: string[];
   fetchedAt?: string;
   error?: string;
 }
@@ -84,6 +85,7 @@ export interface AffectedStock {
   relationship: "Direct" | "Peer" | "Supplier" | "Customer" | "Competitor";
   sentiment: Sentiment;
   reason: string;
+  sourceLabels?: string[];
 }
 
 export interface PredictiveAlert {

@@ -110,6 +110,18 @@ const navItems = [
   { id: "alerts", label: "Alerts", icon: Bell },
 ];
 
+const getWeekStartMonday = (date = new Date()) => {
+  const monday = new Date(date);
+  const daysSinceMonday = (monday.getDay() + 6) % 7;
+  monday.setDate(monday.getDate() - daysSinceMonday);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+};
+
+const weeklyAnalysisLabel = () => `Week of ${dateTime(getWeekStartMonday().toISOString())}`;
+const shouldRefreshWeekly = (lastUpdatedAt?: string) => !lastUpdatedAt || new Date(lastUpdatedAt).getTime() < getWeekStartMonday().getTime();
+const uniqueLabels = (labels: Array<string | undefined>) => [...new Set(labels.filter(Boolean) as string[])];
+
 function Badge({ children, className }: { children: ReactNode; className?: string }) {
   return <span className={cx("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold", className)}>{children}</span>;
 }
@@ -306,6 +318,8 @@ function CompanyOverview({ company, news }: { company: CompanyData; news: NewsIt
     { name: "P/S", Company: company.valuation.ps, Industry: company.valuation.industryAvg.ps },
   ].filter((item) => item.Company > 0 && item.Industry > 0);
   const scoreChart = Object.entries(health.components).map(([name, value]) => ({ name, value }));
+  const relevantNewsSources = news.filter((item) => item.relatedTickers.includes(company.profile.ticker)).map((item) => item.source);
+  const sourceLabels = uniqueLabels([...(company.sourceLabels ?? []), ...relevantNewsSources]).slice(0, 5);
 
   return (
     <div className="grid gap-4">
@@ -317,10 +331,16 @@ function CompanyOverview({ company, news }: { company: CompanyData; news: NewsIt
               <Badge className="bg-slate-900 text-white dark:bg-white dark:text-slate-950">{company.profile.ticker}</Badge>
               <Badge className={valuationStyle[valuation]}>{valuation}</Badge>
               <Badge className={signalStyle[signal.signal]}>{signal.signal}</Badge>
+              <Badge className="bg-cyan-500/15 text-cyan-700 dark:text-cyan-300">Weekly Monday</Badge>
             </div>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {company.profile.industry} · {company.profile.sector ?? "Unknown sector"} · {company.profile.country} · Market Cap {currency(company.profile.marketCap)}
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sources</span>
+              {sourceLabels.map((label) => <Badge key={label} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">{label}</Badge>)}
+              <span className="text-xs text-slate-500">{weeklyAnalysisLabel()}</span>
+            </div>
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Health Score</p>
@@ -444,13 +464,19 @@ function NewsPanel({ news, settings, setSettings, companies }: { news: NewsItem[
     return tickerOk && sectorOk && sentimentOk && impactOk;
   });
   const affected = calculateAffectedStocks(filtered, companies);
+  const newsSourceLabels = uniqueLabels(filtered.map((item) => item.source)).slice(0, 5);
 
   const updateFilters = (patch: Partial<AppSettings["newsFilters"]>) => setSettings({ ...settings, newsFilters: { ...filters, ...patch } });
 
   return (
     <div className="grid gap-4 2xl:grid-cols-[0.95fr_1.05fr]">
       <Card>
-        <SectionTitle icon={AlertTriangle} title="News Impact Engine" />
+        <SectionTitle icon={AlertTriangle} title="News Impact Engine" action={<Badge className="bg-cyan-500/15 text-cyan-700 dark:text-cyan-300">Weekly Monday</Badge>} />
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sources</span>
+          {newsSourceLabels.map((label) => <Badge key={label} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">{label}</Badge>)}
+          <span className="text-xs text-slate-500">{weeklyAnalysisLabel()}</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="text-xs uppercase text-slate-500">
@@ -463,7 +489,12 @@ function NewsPanel({ news, settings, setSettings, companies }: { news: NewsItem[
                   <td className="py-3"><p className="font-bold text-slate-950 dark:text-white">{stock.ticker}</p><p className="text-xs text-slate-500">{stock.companyName}</p></td>
                   <td className="py-3"><Badge className="bg-cyan-500/15 text-cyan-700 dark:text-cyan-300">{stock.relationship}</Badge></td>
                   <td className="py-3"><div className="flex items-center gap-2"><div className="h-2 w-24 rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-2 rounded-full bg-rose-500" style={{ width: `${stock.impactScore}%` }} /></div><span className="font-semibold">{stock.impactScore}</span></div></td>
-                  <td className="py-3 text-slate-600 dark:text-slate-300">{stock.reason}</td>
+                  <td className="py-3 text-slate-600 dark:text-slate-300">
+                    <p>{stock.reason}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(stock.sourceLabels ?? []).slice(0, 3).map((label) => <Badge key={label} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">{label}</Badge>)}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -690,7 +721,7 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!user || syncing) return;
-    refresh(false);
+    refresh(shouldRefreshWeekly(data.lastUpdatedAt));
   }, [portfolio.map((item) => item.ticker).join("|"), user?.id, syncing]);
 
   useEffect(() => {

@@ -39,7 +39,7 @@ const seededNumber = (ticker: string, min: number, max: number) => {
 export const getMockCompany = (ticker: string): CompanyData => {
   const upper = ticker.toUpperCase();
   const existing = mockMap.get(upper);
-  if (existing) return { ...existing, source: "demo", fetchedAt: new Date().toISOString() };
+  if (existing) return { ...existing, source: "demo", sourceLabels: ["Demo Model"], fetchedAt: new Date().toISOString() };
 
   const catalog = tickerCatalog.find((item) => item.ticker === upper) ?? {
     ticker: upper,
@@ -58,6 +58,7 @@ export const getMockCompany = (ticker: string): CompanyData => {
 
   return {
     source: "demo",
+    sourceLabels: ["Demo Model"],
     fetchedAt: new Date().toISOString(),
     analystConsensus: Math.round(seededNumber(upper, 48, 84)),
     marketTrend: Math.round(seededNumber(upper, 44, 82)),
